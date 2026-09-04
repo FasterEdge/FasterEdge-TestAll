@@ -1,0 +1,33 @@
+# FasterEdge-TestAll 通用忽略规则
+# 构建产物
+build/
+dist/
+out/
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+
+# 语言缓存
+__pycache__/
+*.pyc
+node_modules/
+.pio/
+
+# 环境与本地配置
+.env
+.env.*
+*.local
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 日志与临时文件
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
