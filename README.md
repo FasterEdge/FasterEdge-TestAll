@@ -32,4 +32,4 @@ markdownlint-cli2 '**/*.md' '#.git/**' --config .markdownlint-cli2.json
 
 Apache-2.0，详见仓库 LICENSE。
 
-当前版本：**1.0.20260913**
+当前版本：**1.0.20261022**

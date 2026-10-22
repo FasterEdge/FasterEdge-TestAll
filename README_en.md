@@ -32,4 +32,4 @@ markdownlint-cli2 '**/*.md' '#.git/**' --config .markdownlint-cli2.json
 
 Apache-2.0, see the repository LICENSE.
 
-Current version: **1.0.20260913**
+Current version: **1.0.20261022**
