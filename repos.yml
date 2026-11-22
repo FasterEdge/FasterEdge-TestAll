@@ -196,7 +196,8 @@ repos:
     description: eKuiper 增强分支，物联网边缘流式分析引擎
     skip: true
     reason: >-
-      该仓是 324MB 的上游增强分支（module github.com/lf-edge/ekuiper/v2），
+      该仓是实测 437MB 的工作副本（du -sh 含 .git；不含 .git 为 308MB），
+      module 为 github.com/lf-edge/ekuiper/v2 的上游增强分支，
       带 go.work、fvt 契约测试与大量 C 依赖扩展；其测试集需完整拉取依赖并
       运行 FVT 用例，在组织级定时门禁里耗时与失败面都不可控。该仓自带
       .github/workflows/run_fvt_tests.yaml 等门禁，由该仓自己的 CI 承担。

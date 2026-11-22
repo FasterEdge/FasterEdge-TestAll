@@ -6,7 +6,8 @@
   2. job 既无 runs-on 也无 uses 被判定为失败;
   3. 引用了不存在的 scripts/*.py 被判定为失败(防止 workflow 引用幻影脚本);
   4. `paths: [scripts/**]` 这类通配符不被当成脚本路径(避免误报);
-  5. 本仓库真实的 workflow 与 repos.yml 全部通过校验。
+  5. needs 引用链: 前置 job 不存在 / needs 里没列 / 未声明该 output 都被判定为失败;
+  6. 本仓库真实的 workflow 与 repos.yml 全部通过校验。
 
 运行: python3 scripts/check_manifest_test.py
 """
@@ -19,7 +20,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from check_manifest import check_script_refs, check_workflow  # noqa: E402
+from check_manifest import check_needs_refs, check_script_refs, check_workflow  # noqa: E402
 
 FAILURES: list[str] = []
 
@@ -92,6 +93,81 @@ def test_script_refs() -> None:
         check(check_script_refs(glob_path, tmp) == [], "通配符不被当成文件路径")
 
 
+def test_needs_refs() -> None:
+    print("needs 引用链校验")
+    with tempfile.TemporaryDirectory() as tmp:
+        # 复刻 regression.yml 曾有的 bug: matrix 引用 needs.matrix.outputs.include,
+        # 但该 job 的 needs 只有 plan。YAML 合法、needs 本身也没拼错,
+        # 结果 matrix 永远展开为空, 整套回归门禁静默不跑。
+        path = write(
+            tmp,
+            "needs.yml",
+            """\
+name: '示例'
+on:
+  workflow_dispatch:
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.parse.outputs.include }}
+    steps:
+      - id: parse
+        run: echo 'include=[]' >> "$GITHUB_OUTPUT"
+  matrix:
+    runs-on: ubuntu-latest
+    needs: plan
+    steps:
+      - run: echo noop
+  regression:
+    runs-on: ubuntu-latest
+    needs: plan
+    strategy:
+      matrix:
+        include: ${{ fromJSON(needs.matrix.outputs.include) }}
+    steps:
+      - run: echo noop
+""",
+        )
+        errors = check_workflow(path)
+        # 只对 needs.matrix.outputs.include 这一处, 不应有 plan 的误报
+        hits = [err for err in errors if "needs.matrix.outputs.include" in err]
+        check(len(hits) >= 1, f"needs 里没有的前置 job 被点名: {errors}")
+        check(
+            not any("needs.plan.outputs.include" in err for err in errors),
+            f"合法引用不误报: {errors}",
+        )
+
+        # 修好之后(改成 needs.plan.outputs.include) 必须干净
+        fixed = os.path.join(tmp, "fixed.yml")
+        with open(path, "r", encoding="utf-8") as handle:
+            text = handle.read().replace(
+                "needs.matrix.outputs.include", "needs.plan.outputs.include"
+            )
+        with open(fixed, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        check(check_workflow(fixed) == [], f"修正后无报错: {check_workflow(fixed)}")
+
+        # 前置 job 不存在
+        jobs = {
+            "a": {"runs-on": "x", "needs": "ghost"},
+        }
+        check(
+            any("ghost" in err for err in check_needs_refs("wf.yml", jobs)),
+            f"needs 指向不存在的 job 被点名: {check_needs_refs('wf.yml', jobs)}",
+        )
+
+        # output 名字写错
+        jobs = {
+            "plan": {"runs-on": "x", "outputs": {"include": "x"}},
+            "run": {"runs-on": "x", "needs": "plan", "if": "${{ needs.plan.outputs.nope }}"},
+        }
+        check(
+            any("outputs.nope" in err for err in check_needs_refs("wf.yml", jobs)),
+            f"未声明的 output 被点名: {check_needs_refs('wf.yml', jobs)}",
+        )
+
+
 def test_real_repository_manifests() -> None:
     print("本仓库真实清单通过校验")
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -106,6 +182,7 @@ def main() -> int:
     test_job_without_runner()
     test_broken_yaml_is_reported()
     test_script_refs()
+    test_needs_refs()
     test_real_repository_manifests()
 
     print()

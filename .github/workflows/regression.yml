@@ -78,7 +78,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.matrix.outputs.include) }}
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
     env:
       # clone 时需要的分支/tag; repos.yml 中 ref 为空时用仓库默认分支
       REF: ${{ matrix.ref }}
