@@ -1,0 +1,203 @@
+# FasterEdge-TestAll 组织级回归门禁：被检仓库清单。
+#
+# 设计约束（重要，不要绕过）：
+#   1. 各组件仓库是相互独立的 git 仓库，不能在本仓库里 checkout。
+#      因此工作流按条目 clone 各仓后，进入 working_directory 执行下面声明的命令。
+#   2. 每条命令必须是"在该仓库目录下可直接执行"的真实命令，
+#      且必须在本机或 CI 上被实际跑过一次（见 README.md「验证记录」一节）。
+#   3. 某条命令当前跑不通时，显式置 skip: true 并写明 reason，
+#      禁止留空、禁止写占位命令、禁止让 CI 静默跳过。
+#
+# 字段说明：
+#   name        : 展示名
+#   url         : clone 地址（GitHub 公开仓库，CI 无需凭据）
+#   ref         : 检出分支或 tag；留空表示仓库默认分支
+#   go_version  : 该仓 go.mod 声明的 Go 版本（由各仓 go.mod 的 go 指令读出）
+#   commands    : 顺序执行的命令列表，任一条失败即该仓判定失败
+#   skip        : true 表示该条目当前不参与门禁
+#   reason      : skip 为 true 时必填，说明为什么不能跑
+
+version: 1
+
+defaults:
+  # 组织级统一工具链版本；各仓 go.mod 均声明 go 1.27.4
+  go_version: '1.27.4'
+
+repos:
+  - name: FasterEdge
+    url: https://github.com/FasterEdge/FasterEdge.git
+    ref: main
+    description: 节点运行时框架（ability / types / data）
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: ProxyArea
+    url: https://github.com/FasterEdge/ProxyArea.git
+    ref: main
+    description: 代理区服务（根包 main + examples/testserver）
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: NetMap
+    url: https://github.com/FasterEdge/NetMap.git
+    ref: main
+    description: 集群拓扑服务（cmd/netmap + internal/*）
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: FasterEdge2Api
+    url: https://github.com/FasterEdge/FasterEdge2Api.git
+    ref: main
+    description: 集群拓扑与系统管理 API（依赖 FasterEdge 模块）
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: DontCrack-Manager
+    url: https://github.com/FasterEdge/DontCrack-Manager.git
+    ref: main
+    description: 进程监管器（internal/config,status,supervisor）
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: DontCrack4Windows
+    url: https://github.com/FasterEdge/DontCrack4Windows.git
+    ref: main
+    description: Windows 平台进程管理实现
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: DontCrack4Mac
+    url: https://github.com/FasterEdge/DontCrack4Mac.git
+    ref: main
+    description: macOS 平台进程管理实现
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: DontCrack4ManyLinux
+    url: https://github.com/FasterEdge/DontCrack4ManyLinux.git
+    ref: main
+    description: Linux 多发行版平台进程管理实现
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: DontCrack4OpenHarmonyLinuxKernelSide
+    url: https://github.com/FasterEdge/DontCrack4OpenHarmonyLinuxKernelSide.git
+    ref: main
+    description: OpenHarmony 内核态进程管理实现
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: DontCrack4AndroidLinuxKernelSide
+    url: https://github.com/FasterEdge/DontCrack4AndroidLinuxKernelSide.git
+    ref: main
+    description: Android 内核态进程管理实现
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: Any2UTF8
+    url: https://github.com/FasterEdge/Any2UTF8.git
+    ref: main
+    description: 文本/文件转 UTF-8 工具
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: Any2Pcd
+    url: https://github.com/FasterEdge/Any2Pcd.git
+    ref: main
+    description: 点云转 PCD 工具
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: FasterEdgeDoctor
+    url: https://github.com/FasterEdge/FasterEdgeDoctor.git
+    ref: main
+    description: 环境自检 CLI
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: MqttBroker
+    url: https://github.com/FasterEdge/MqttBroker.git
+    ref: main
+    description: MQTT Broker（含内置 UI）
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: MqttBrokerCore
+    url: https://github.com/FasterEdge/MqttBrokerCore.git
+    ref: main
+    description: MQTT Broker 核心协议库
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: SimpleTimeService
+    url: https://github.com/FasterEdge/SimpleTimeService.git
+    ref: main
+    description: 简单授时服务
+    commands:
+      - go vet ./...
+      - go test -count=1 ./...
+
+  - name: FasterEdgeOS
+    url: https://github.com/FasterEdge/FasterEdgeOS.git
+    ref: main
+    description: 边缘计算操作系统（内核/glibc/BusyBox overlay 构建）
+    skip: true
+    reason: >-
+      完整镜像构建需要 Linux 构建主机、GNU make、内核与 glibc 源码构建链；
+      本机（Windows）无 make，也不具备内核构建条件。该仓自带
+      .github/workflows/check.yml（sh -n + shellcheck + 各 bundle 的
+      go build/vet/test），由该仓自己的 CI 承担，不重复纳入本门禁。
+      待补齐 Linux 构建主机后可改为执行该仓 check.yml 中的等价命令。
+
+  - name: TsnHub
+    url: https://github.com/FasterEdge/TsnHub.git
+    ref: main
+    description: 基于 open62541 的 TSN 仿真中间节点（C++/CMake）
+    skip: true
+    reason: >-
+      完整构建需要 Conan 2.x 拉取 CLI11 与 open62541 1.5，本机未安装 conan
+      与 open62541（无 docker）。Portable 模式（TSNHUB_USE_OPEN62541_PUBSUB=OFF）
+      在本机 cmake 4.4.3 + MinGW g++ 16.2.0 下可配置，但当前工作区有未提交改动，
+      其中 tests/SchedulerLatencyTest.cpp:248 传入 PrioritySummary 而非
+      std::array<PrioritySummary, 8>，编译失败；该问题属于 TsnHub 本仓范围，
+      不由本仓库代改。故暂列 skip，待该仓修复后改为执行
+      cmake -S . -B build-portable -DTSNHUB_USE_OPEN62541_PUBSUB=OFF 后
+      cmake --build + ctest。
+
+  - name: DontCrack-Desktop
+    url: https://github.com/FasterEdge/DontCrack-Desktop.git
+    ref: main
+    description: Tauri + Vue 桌面端
+    # 本机验证说明: 本机 ~/.npmrc 把代理固定到失效的 127.0.0.1:7897,
+    # 直接 `npm ci` 会 ECONNREFUSED; 用干净的 userconfig 指向 registry.npmjs.org
+    # 后 npm ci + npm run build 均通过(CI runner 无该代理, 无需特殊处理)。
+    commands:
+      - npm ci
+      - npm run build
+
+  - name: B2C
+    url: https://github.com/FasterEdge/B2C.git
+    ref: main
+    description: eKuiper 增强分支，物联网边缘流式分析引擎
+    skip: true
+    reason: >-
+      该仓是 324MB 的上游增强分支（module github.com/lf-edge/ekuiper/v2），
+      带 go.work、fvt 契约测试与大量 C 依赖扩展；其测试集需完整拉取依赖并
+      运行 FVT 用例，在组织级定时门禁里耗时与失败面都不可控。该仓自带
+      .github/workflows/run_fvt_tests.yaml 等门禁，由该仓自己的 CI 承担。
+      如需纳入，应先拆分出轻量子集并在该仓内定义可缓存的检查命令。

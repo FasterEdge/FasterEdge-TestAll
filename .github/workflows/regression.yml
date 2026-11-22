@@ -1,0 +1,136 @@
+# FasterEdge 开源项目 - Github: https://github.com/FasterEdge - Gitee: https://gitee.com/FasterEdge
+# 组织级回归门禁: 按 repos.yml 清单逐个 clone 各组件仓库并执行其声明的检查命令。
+# 各组件仓库是相互独立的 git 仓库, 无法在本仓库内 checkout, 因此这里显式 clone。
+name: '组织级回归门禁(repos.yml)'
+
+on:
+  schedule:
+    # 每周一 03:17 UTC 定时触发
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      repos:
+        description: '要检查的仓库名, 逗号分隔; 留空表示清单内全部条目'
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - 'repos.yml'
+      - '.github/workflows/regression.yml'
+      - 'scripts/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: 'org-regression-${{ github.ref }}'
+  cancel-in-progress: false
+
+jobs:
+  # 清单与 workflow 自身的静态校验: 让 repos.yml 的笔误(缺 reason、
+  # 空 commands、重名)在 clone 任何仓库之前就失败, 避免用 CI 时间换错误信息。
+  lint:
+    name: '清单与 workflow 校验'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: '准备 PyYAML'
+        # ubuntu-24.04 runner 的系统 Python 带 PEP 668 标记, 直接 pip install
+        # 会报 externally-managed-environment; 已装则跳过, 未装才带
+        # --break-system-packages 安装(仅装到 job 内的临时环境)。
+        run: |
+          python3 -c 'import yaml' 2>/dev/null \
+            || python3 -m pip install --quiet --break-system-packages pyyaml
+          python3 -c 'import yaml; print("PyYAML", yaml.__version__)'
+      - name: '校验 repos.yml 与 workflows'
+        run: python3 scripts/check_manifest.py .
+      - name: '清单解析单测'
+        run: python3 scripts/parse_repos_test.py
+      - name: '清单校验器单测'
+        run: python3 scripts/check_manifest_test.py
+
+  # 先把 repos.yml 解析成 matrix, 每个仓库一个独立 job:
+  # 单仓失败不会拖垮其余仓库, 也便于在 Checks 页逐仓定位。
+  plan:
+    name: '解析 repos.yml'
+    runs-on: ubuntu-latest
+    needs: lint
+    outputs:
+      include: ${{ steps.parse.outputs.include }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: '准备 PyYAML'
+        run: |
+          python3 -c 'import yaml' 2>/dev/null \
+            || python3 -m pip install --quiet --break-system-packages pyyaml
+          python3 -c 'import yaml; print("PyYAML", yaml.__version__)'
+      - id: parse
+        name: '生成 matrix'
+        env:
+          SELECTED_REPOS: ${{ github.event.inputs.repos }}
+        run: python3 scripts/parse_repos.py repos.yml --github-output "$GITHUB_OUTPUT" ${SELECTED_REPOS}
+
+  regression:
+    name: '${{ matrix.name }}'
+    runs-on: ubuntu-latest
+    needs: plan
+    if: ${{ needs.plan.outputs.include != '' && needs.plan.outputs.include != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.matrix.outputs.include) }}
+    env:
+      # clone 时需要的分支/tag; repos.yml 中 ref 为空时用仓库默认分支
+      REF: ${{ matrix.ref }}
+      REPO_NAME: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: testall
+
+      - name: 'clone ${{ matrix.name }}'
+        run: |
+          set -euo pipefail
+          mkdir -p target
+          if [ -n "${REF}" ]; then
+            git clone --depth 1 --branch "${REF}" \
+              "https://github.com/FasterEdge/${REPO_NAME}.git" target
+          else
+            git clone --depth 1 "https://github.com/FasterEdge/${REPO_NAME}.git" target
+          fi
+          # 用 log 的返回码而不是 clone 的输出判断是否真的取到了代码
+          git -C target rev-parse --verify HEAD >/dev/null
+          git -C target log -1 --format='commit %H%nsubject %s'
+
+      - name: '设置 Go ${{ matrix.go_version }}'
+        if: ${{ matrix.needs_go }}
+        uses: actions/setup-go@v7
+        with:
+          go-version: '${{ matrix.go_version }}'
+          cache-dependency-path: target/go.sum
+
+      - name: '设置 Node'
+        if: ${{ matrix.needs_node }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: target/package-lock.json
+
+      - name: '执行 ${{ matrix.name }} 检查命令'
+        working-directory: target
+        env:
+          # toJSON 把 commands 数组序列化成字符串; 直接写 ${{ matrix.commands }}
+          # 会依赖 GitHub 对数组的隐式字符串化, 不保证是合法 JSON, 故显式 toJSON。
+          CHECK_COMMANDS: ${{ toJSON(matrix.commands) }}
+        run: |
+          set -euo pipefail
+          echo "仓库: ${REPO_NAME} (ref: ${REF})"
+          # commands 由 matrix 以 JSON 数组下发, 逐条执行, 任一条失败即本 job 失败
+          mapfile -t cmds < <(printf '%s' "${CHECK_COMMANDS}" | jq -r '.[]')
+          for cmd in "${cmds[@]}"; do
+            echo "::group::\$ $cmd"
+            bash -c "$cmd"
+            echo "::endgroup::"
+          done
+          echo "${REPO_NAME}: 全部检查命令通过"
