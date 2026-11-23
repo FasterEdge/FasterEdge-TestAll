@@ -197,4 +197,4 @@ Baseline before any fix, same command, two measured runs: the first **13 of 17**
 
 Apache-2.0, see the repository LICENSE.
 
-Current version: **1.0.20261123**
+Current version: **1.0.20261124**
